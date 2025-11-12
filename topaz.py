@@ -1,5 +1,3 @@
-import json
-import os
 import sys
 from re import split as rsplit
 
@@ -35,11 +33,49 @@ class MainWindow(QtWidgets.QMainWindow):
     def adding_data_into_widget(self, note):
         '''Add data into VBox Layout. Then it'll add to a grid.'''
         notes_box = QtWidgets.QVBoxLayout()
-        title_label = QtWidgets.QLabel(f'Title: <b>{note[0]}</b>')
-        text_label = QtWidgets.QLabel(f'Text: {note[1][0]}')
-        notes_box.addWidget(title_label)
-        notes_box.addWidget(text_label)
+        test_button = QtWidgets.QPushButton()
+        test_button.setFixedWidth(100)
+        test_button.setFixedHeight(100)
+        test_button.title = note[0]
+        test_button.text = note[1][0]
+        test_button.setText(f'{note[0]}\n\n {note[1][0]}')
+        test_button.setStyleSheet("""
+            QPushButton {
+                background-color: white;
+                border: 2px solid #4CAF50;
+                border-radius: 12px;
+                text-align: left;
+                padding: 4px 8px;
+            }
+        """)
+
+        # title_label = QtWidgets.QLabel(f'Title: <b>{note[0]}</b>')
+        # text_label = QtWidgets.QLabel(f'Text: {note[1][0]}')
+        notes_box.addWidget(test_button)
+        test_button.clicked.connect(self.show_single_note)
+        # notes_box.addWidget(title_label)
+        # notes_box.addWidget(text_label)
         return notes_box
+
+    def show_single_note(self):
+        '''Function must update db not insert new data'''
+        self.create_note()
+        # sender = self.sender()
+
+        # self.show_note = QtWidgets.QWidget()
+        # self.stack.addWidget(self.show_note)
+
+        # layout = QtWidgets.QVBoxLayout()
+
+        # title = QtWidgets.QLineEdit(sender.title)
+        # text = QtWidgets.QTextEdit(sender.text)
+
+        # layout.addWidget(title)
+        # layout.addWidget(text)
+
+        # self.show_note.setLayout(layout)
+
+        # self.stack.setCurrentWidget(self.show_note)
 
     def show_main_window(self):
         self.notes = self.load_notes()
