@@ -1,89 +1,103 @@
 import json
 import os
 import sys
+from re import split as rsplit
 
 from PyQt6 import QtGui
 from PyQt6 import QtCore
 from PyQt6 import QtWidgets
 
-"""
-https://habr.com/ru/companies/skillfactory/articles/599599/
-
-"""
+from models import ManageDb
 
 
-class ShowMenu(QtWidgets.QWidget):
-    def __init__(self, load_data):
+NOTES_JSON_FILE = 'notes.json'
+
+
+class MainWindow(QtWidgets.QMainWindow):
+    '''Main window.'''
+    def __init__(self, db):
         super().__init__()
-        self.load_data = load_data()
+        self.db = db
 
-        self.setup_menu()
+        self.initializeUI()
 
-    def setup_menu(self):
-        self.layout = QtWidgets.QVBoxLayout()
-        note_widget = QtWidgets.QWidget()
-        if self.load_data is None:
-            return
-        for data in self.load_data:
-            title_widget = QtWidgets.QLabel(data['title'])
-            text_widget = QtWidgets.QLabel(data['text'])
-            self.layout.addWidget(title_widget)
-            self.layout.addWidget(text_widget)
-        note_widget.setLayout(self.layout)
+    def initializeUI(self):
+        self.setGeometry(300, 300, 400, 300)
+        self.setWindowTitle("Topaz")
 
+        self.stack = QtWidgets.QStackedWidget()
+        self.setCentralWidget(self.stack)
 
-class MainMenu(QtWidgets.QWidget):
-    def __init__(self, open_create_menu_callback, load_data):
-        super().__init__()
+        self.show_main_window()
 
-        ShowMenu(load_data)
+        self.show()
 
-        self.layout = QtWidgets.QVBoxLayout()
+    def adding_data_into_widget(self, note):
+        '''Add data into VBox Layout. Then it'll add to a grid.'''
+        notes_box = QtWidgets.QVBoxLayout()
+        title_label = QtWidgets.QLabel(f'Title: <b>{note[0]}</b>')
+        text_label = QtWidgets.QLabel(f'Text: {note[1][0]}')
+        notes_box.addWidget(title_label)
+        notes_box.addWidget(text_label)
+        return notes_box
 
-        # Button for create a note
-        self.create_button = QtWidgets.QPushButton('Create a note')
+    def show_main_window(self):
+        self.notes = self.load_notes()
+
+        self.window = QtWidgets.QWidget()
+        self.stack.addWidget(self.window)
+
+        self.main_box = QtWidgets.QVBoxLayout()
+        self.notes_grid = QtWidgets.QGridLayout()
+
+        self.create_button = QtWidgets.QPushButton('Create note')
         self.create_button.setFixedWidth(200)
-        self.layout.addWidget(self.create_button, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.main_box.addWidget(
+            self.create_button,
+            alignment=QtCore.Qt.AlignmentFlag.AlignCenter
+        )
 
-        # Container where notes will appear
-        self.notes_container = QtWidgets.QVBoxLayout()
-        self.layout.addLayout(self.notes_container)
-        self.layout.addStretch()
+        # Adding data into grid
+        self.cols = 2
+        self.add_item_to_grid()
 
-        self.setLayout(self.layout)
+        self.main_box.addLayout(self.notes_grid)
+        self.window.setLayout(self.main_box)
+        self.main_box.addStretch()
 
-        self.create_button.clicked.connect(open_create_menu_callback)
+        self.create_button.clicked.connect(self.create_note)
 
-    def add_note(self, title, text):
-        """Add a new note label dynamically."""
-        # new_but = QtWidgets.QPushButton()
+        self.stack.setCurrentWidget(self.window)
 
-        note_widget = QtWidgets.QWidget()
-        note_layout = QtWidgets.QVBoxLayout()
-        note_layout.setContentsMargins(0, 0, 0, 0)
-        title_label = QtWidgets.QLabel(f"Title: <b>{title}</b>")
-        # title_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
-        text_label = QtWidgets.QLabel(f'Text: {text}')
-        text_label.setWordWrap(True)
+    def add_item_to_grid(self):
+        for i, note in enumerate(self.notes.items()):
+            r, c = divmod(i, self.cols)
+            notes_box = self.adding_data_into_widget(note)
+            self.notes_grid.addItem(notes_box, r, c)
+        return notes_box, r, c
 
-        note_layout.addWidget(title_label)
-        note_layout.addWidget(text_label)
-        note_widget.setLayout(note_layout)
+    def refresh_notes(self, data):
+        # for i in reversed(range(self.notes_grid.count())): # Reversed?
+        for i in range(self.notes_grid.count()):
+            widget = self.notes_grid.itemAt(i).widget()
+            if widget:
+                self.notes_grid.removeWidget(widget)
+                widget.deleteLater()
 
-        # Add to container
-        self.notes_container.addWidget(note_widget)
+        self.notes[data['title']] = (data['text'], data['tags'])
 
+        notes_box, r, c = self.add_item_to_grid()
 
-class CreateMenu(QtWidgets.QWidget):
-    '''
-    Create menu.
-    '''
-    def __init__(self, save_callback, back_callback):
-        super().__init__()
+        self.notes_grid.addLayout(notes_box, r, c)
+
+    def create_note(self):
+        self.create_window = QtWidgets.QWidget()
+        self.stack.addWidget(self.create_window)
+
         layout = QtWidgets.QVBoxLayout()
         layout_for_buttons = QtWidgets.QHBoxLayout()
 
-        # DATA
+        # Accept_button
         self.accept_button = QtWidgets.QPushButton()
         self.accept_button.setFixedWidth(50)
         self.accept_button.setIcon(QtGui.QIcon('check-mark2.png'))
@@ -91,90 +105,63 @@ class CreateMenu(QtWidgets.QWidget):
         self.accept_button.setFixedHeight(40)
         self.accept_button.setStyleSheet('border: 0px;')
 
+        # Title field
         self.title = QtWidgets.QLineEdit()
         self.title.setPlaceholderText('Enter title')
 
+        # Text field
         self.text = QtWidgets.QTextEdit()
         self.text.setPlaceholderText('Enter note text here')
+
+        # Tags field
+        self.tags = QtWidgets.QLineEdit()
+        self.tags.setPlaceholderText('Enter note tags here')
 
         # Back button
         self.back_button = QtWidgets.QPushButton('← Back')
         self.back_button.setFixedHeight(40)
         self.back_button.setStyleSheet('border: 0px;')
 
+        # Managing layout
         layout_for_buttons.addStretch()
         layout_for_buttons.addWidget(self.back_button)
         layout_for_buttons.addWidget(self.accept_button)
         layout.addLayout(layout_for_buttons)
         layout.addWidget(self.title)
+        layout.addWidget(self.tags)
         layout.addWidget(self.text)
         layout.addStretch()
+        self.create_window.setLayout(layout)
 
-        self.accept_button.clicked.connect(
-            lambda: save_callback(self.title.text(), self.text.toPlainText())
+        # Connecting buttons
+        self.accept_button.clicked.connect(self.click_accept_button)
+        self.back_button.clicked.connect(self.click_back_button)
+
+        self.stack.setCurrentWidget(self.create_window)
+
+    def click_accept_button(self):
+        note = {
+                'title': self.title.text(),
+                'text': self.text.toPlainText(),
+                'tags': rsplit(r'[,|\s|,\s]', self.tags.text())
+        }
+        self.db.insert_data_in_tables(
+            note['title'], note['text'], note['tags']
         )
-        self.back_button.clicked.connect(back_callback)
-        self.setLayout(layout)
+        self.refresh_notes(note)
+        self.stack.setCurrentWidget(self.window)
 
-    def clear_fields(self):
-        """Clear text boxes after saving."""
-        self.title.clear()
-        self.text.clear()
+    def click_back_button(self):
+        self.stack.setCurrentWidget(self.window)
 
-
-class MainWindow(QtWidgets.QMainWindow):
-    '''Main window.'''
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Topaz")
-        self.setGeometry(300, 300, 400, 300)
-
-        self.stack = QtWidgets.QStackedWidget()
-        self.setCentralWidget(self.stack)
-
-        self.main_menu = MainMenu(self.show_create_menu, self.load_data)
-        self.create_menu = CreateMenu(self.save_data, self.show_main_menu)
-
-        self.stack.addWidget(self.main_menu)
-        self.stack.addWidget(self.create_menu)
-
-        self.stack.setCurrentWidget(self.main_menu)
-
-    def show_create_menu(self):
-        self.stack.setCurrentWidget(self.create_menu)
-
-    def show_main_menu(self):
-        self.stack.setCurrentWidget(self.main_menu)
-
-    def save_data(self, title, text):
-        # notes = []
-        note = {'title': title, 'text': text}
-        # notes.append(note)
-        with open('notes.json', 'a', encoding='utf-8') as f:
-            # for note in notes
-            json.dump(note, f, indent=2, ensure_ascii=False)
-        self.show_main_menu()
-
-        # if title.strip() or text.strip():
-        #     self.main_menu.add_note(title.strip() or "Untitled", text[:10].strip())
-        #     print(f"Saved note: {title} -> {text[:10]}")
-        # self.create_menu.clear_fields()
-        # self.show_main_menu()
-
-    def load_data(self):
-        # data = json.load('notes.json')
-        data = None
-        if os.path.exists('notes.json'):
-            with open('notes.json', 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            print(data)
+    def load_notes(self):
+        data = self.db.get_all_data_from_db()
         return data
 
 
 if __name__ == '__main__':
+    db = ManageDb()
+    db.create_tables() # Late hide this in some script
     app = QtWidgets.QApplication(sys.argv)
-
-    window = MainWindow()
-    window.show()
-
+    window = MainWindow(db)
     app.exec()

@@ -1,0 +1,138 @@
+import sqlite3
+
+DB_NAME = 'notes.db'
+
+
+class ManageDb:
+    def __init__(self):
+        ...
+
+    def connect_to_db(self):
+        return sqlite3.connect(DB_NAME)
+
+    def create_tables(self):
+        sql_statements = [
+            '''CREATE TABLE IF NOT EXISTS tag (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(24) UNIQUE
+                );''',
+            '''CREATE TABLE IF NOT EXISTS note_tag (
+                tag_id INTEGER,
+                note_id INTEGER,
+                PRIMARY KEY (tag_id, note_id),
+                FOREIGN KEY (tag_id) REFERENCES tag (id),
+                FOREIGN KEY (note_id) REFERENCES note (id)
+                );''',
+            '''CREATE TABLE IF NOT EXISTS note (
+                id INTEGER PRIMARY KEY,
+                title VARCHAR(24),
+                text TEXT,
+                FOREIGN KEY (id) REFERENCES note_tag (note_id)
+                );'''
+
+        ]
+        try:
+            with self.connect_to_db() as conn:
+                cursor = conn.cursor()
+                for statement in sql_statements:
+                    cursor.execute(statement)
+        except sqlite3.Error as e:
+            print(f'Error occured: \n {e}')
+
+    def insert_tags_into_table(self, cursor, tags: list):
+        """Insert data into tag table.
+
+        cursor argument need for consistency:
+        If the tag insertion fails, the connection should rollback().
+        """
+        try:
+            # Insert data in db
+            insert_tag_data = 'INSERT OR IGNORE INTO tag(name) VALUES(?);'
+            cursor.executemany(insert_tag_data, [(tag,) for tag in tags])
+
+            # Get data from db
+            join_tags = ','.join('?' for _ in tags)
+            select_data_from_tag = (
+                f'SELECT id, name FROM tag WHERE name IN ({join_tags});'
+            )
+            cursor.execute(select_data_from_tag, tags)
+            get_data_from_tag = cursor.fetchall()
+            tag_ids: list = [data[0] for data in get_data_from_tag]
+            return tag_ids
+        except sqlite3.Error as e:
+            print(f'Error occured: \n {e}')
+
+    def insert_data_in_tables(self, title: str, text: str, tags: list):
+        try:
+            with self.connect_to_db() as conn:
+                cursor = conn.cursor()
+
+                # Insert data into tag table
+                list_id_tags = self.insert_tags_into_table(cursor, tags)
+
+                # Insert data into note table
+                insert_data_note = (
+                    'INSERT INTO note(title, text) VALUES(?, ?);'
+                )
+                cursor.execute(insert_data_note, (title, text))
+                note_last_row_id = cursor.lastrowid
+
+                # Insert data into intermediate table note_tag
+                insert_data_note_tag = (
+                    'INSERT INTO note_tag(tag_id, note_id) VALUES(?, ?);'
+                )
+                cursor.executemany(
+                    insert_data_note_tag,
+                    ([(tag_id, note_last_row_id) for tag_id in list_id_tags])
+                )
+        except sqlite3.Error as e:
+            print(f'Error occured: \n {e}')
+
+    def get_all_data_from_db(self):
+        try:
+            with self.connect_to_db() as conn:
+                cursor = conn.cursor()
+                statement = '''
+                    SELECT n.title, n.text, t.name FROM note n
+                    LEFT JOIN note_tag nt ON (n.id=nt.note_id)
+                    LEFT JOIN tag t ON (t.id=nt.tag_id);
+                '''
+                cursor.execute(statement)
+                data = cursor.fetchall()
+                test_dict = {}
+                for data in data:
+                    if test_dict.get(data[0]):
+                        # print(test_dict[data[0]][1])
+                        test_dict[data[0]][1].append(data[2])
+                    else:
+                        test_dict[data[0]] = (data[1], [data[2]])
+
+                return test_dict
+        except sqlite3.Error as e:
+            print(f'Error occured: \n {e}')
+
+    def show_data(self, note_title):
+        try:
+            with self.connect_to_db() as conn:
+                cursor = conn.cursor()
+                statement = '''
+                SELECT n.title, n.text, t.name FROM note n
+                JOIN note_tag nt ON (n.id=nt.note_id)
+                JOIN tag t ON (t.id=nt.tag_id)
+                WHERE n.title=(?);'''
+                cursor.execute(statement, (note_title,))
+                data = cursor.fetchall()
+                return data
+        except sqlite3.Error as e:
+            print(f'Error occured: \n {e}')
+
+
+if __name__ == '__main__':
+    init_db = ManageDb()
+    init_db.create_tables()
+    title = 'ThirdNote'
+    text = 'ThirdText'
+    tags = ['#history', '#programming', '#hashtag']
+    # init_db.insert_data_in_tables(title, text, tags)
+    # init_db.show_data('ThirdNote')
+    print(init_db.get_all_data_from_db())
