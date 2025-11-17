@@ -20,8 +20,8 @@ class ManageDb:
                 tag_id INTEGER,
                 note_id INTEGER,
                 PRIMARY KEY (tag_id, note_id),
-                FOREIGN KEY (tag_id) REFERENCES tag (id),
-                FOREIGN KEY (note_id) REFERENCES note (id)
+                FOREIGN KEY (tag_id) REFERENCES tag (id) ON DELETE CASCADE,
+                FOREIGN KEY (note_id) REFERENCES note (id) ON DELETE CASCADE
                 );''',
             '''CREATE TABLE IF NOT EXISTS note (
                 id INTEGER PRIMARY KEY,
@@ -48,7 +48,9 @@ class ManageDb:
         try:
             # Insert data in db
             insert_tag_data = 'INSERT OR IGNORE INTO tag(name) VALUES(?);'
-            cursor.executemany(insert_tag_data, [(tag,) for tag in tags])
+            cursor.executemany(
+                insert_tag_data, [(tag,) for tag in tags if tag != '']
+            )
 
             # Get data from db
             join_tags = ','.join('?' for _ in tags)
@@ -93,21 +95,20 @@ class ManageDb:
             with self.connect_to_db() as conn:
                 cursor = conn.cursor()
                 statement = '''
-                    SELECT n.title, n.text, t.name FROM note n
-                    LEFT JOIN note_tag nt ON (n.id=nt.note_id)
-                    LEFT JOIN tag t ON (t.id=nt.tag_id);
-                '''
-                cursor.execute(statement)
-                data = cursor.fetchall()
-                test_dict = {}
-                for data in data:
-                    if test_dict.get(data[0]):
-                        # print(test_dict[data[0]][1])
-                        test_dict[data[0]][1].append(data[2])
-                    else:
-                        test_dict[data[0]] = (data[1], [data[2]])
+                    SELECT n.id, n.title, n.text,
+                    GROUP_CONCAT(t.name, ',') AS tags
+                    FROM note n
+                    LEFT JOIN note_tag nt ON n.id = nt.note_id
+                    LEFT JOIN tag t ON t.id = nt.tag_id
+                    GROUP BY n.id;'''
+            cursor.execute(statement)
+            data_from_db = cursor.fetchall()
 
-                return test_dict
+            db_dict = {}
+            for _, title, text, tags in data_from_db:
+                db_dict[title] = (text, tags.split(',') if tags else [])
+            return db_dict
+
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
@@ -116,15 +117,27 @@ class ManageDb:
             with self.connect_to_db() as conn:
                 cursor = conn.cursor()
                 statement = '''
-                SELECT n.title, n.text, t.name FROM note n
-                JOIN note_tag nt ON (n.id=nt.note_id)
-                JOIN tag t ON (t.id=nt.tag_id)
-                WHERE n.title=(?);'''
+                    SELECT n.title, n.text, t.name FROM note n
+                    LEFT JOIN note_tag nt ON (n.id=nt.note_id)
+                    LEFT JOIN tag t ON (t.id=nt.tag_id)
+                    WHERE n.title=(?);'''
                 cursor.execute(statement, (note_title,))
                 data = cursor.fetchall()
                 return data
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
+
+    # def update_data(self, title, text, tags):
+    #     try:
+    #         with self.connect_to_db() as conn:
+    #             cursor = conn.cursor()
+    #             statement = '''
+    #                 UPDATE '''
+    #             cursor.execute(statement, (note_title,))
+    #             data = cursor.fetchall()
+    #             return data
+    #     except sqlite3.Error as e:
+    #         print(f'Error occured: \n {e}')
 
 
 if __name__ == '__main__':

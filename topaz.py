@@ -38,6 +38,7 @@ class MainWindow(QtWidgets.QMainWindow):
         test_button.setFixedHeight(100)
         test_button.title = note[0]
         test_button.text = note[1][0]
+        test_button.tags = note[1][1]
         test_button.setText(f'{note[0]}\n\n {note[1][0]}')
         test_button.setStyleSheet("""
             QPushButton {
@@ -49,33 +50,16 @@ class MainWindow(QtWidgets.QMainWindow):
             }
         """)
 
-        # title_label = QtWidgets.QLabel(f'Title: <b>{note[0]}</b>')
-        # text_label = QtWidgets.QLabel(f'Text: {note[1][0]}')
         notes_box.addWidget(test_button)
         test_button.clicked.connect(self.show_single_note)
-        # notes_box.addWidget(title_label)
-        # notes_box.addWidget(text_label)
         return notes_box
 
     def show_single_note(self):
         '''Function must update db not insert new data'''
-        self.create_note()
-        # sender = self.sender()
-
-        # self.show_note = QtWidgets.QWidget()
-        # self.stack.addWidget(self.show_note)
-
-        # layout = QtWidgets.QVBoxLayout()
-
-        # title = QtWidgets.QLineEdit(sender.title)
-        # text = QtWidgets.QTextEdit(sender.text)
-
-        # layout.addWidget(title)
-        # layout.addWidget(text)
-
-        # self.show_note.setLayout(layout)
-
-        # self.stack.setCurrentWidget(self.show_note)
+        sender = self.sender()
+        self.create_note(
+            sender.title, sender.text, sender.tags, is_update=True
+        )
 
     def show_main_window(self):
         self.notes = self.load_notes()
@@ -106,6 +90,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.setCurrentWidget(self.window)
 
     def add_item_to_grid(self):
+        notes_box, r, c = None, None, None
         for i, note in enumerate(self.notes.items()):
             r, c = divmod(i, self.cols)
             notes_box = self.adding_data_into_widget(note)
@@ -126,7 +111,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.notes_grid.addLayout(notes_box, r, c)
 
-    def create_note(self):
+    def create_note(self, title=None, text=None, tags=None, is_update=False):
         self.create_window = QtWidgets.QWidget()
         self.stack.addWidget(self.create_window)
 
@@ -144,14 +129,20 @@ class MainWindow(QtWidgets.QMainWindow):
         # Title field
         self.title = QtWidgets.QLineEdit()
         self.title.setPlaceholderText('Enter title')
+        if title:
+            self.title.setText(title)
 
         # Text field
         self.text = QtWidgets.QTextEdit()
         self.text.setPlaceholderText('Enter note text here')
+        if text:
+            self.text.setText(text)
 
         # Tags field
         self.tags = QtWidgets.QLineEdit()
         self.tags.setPlaceholderText('Enter note tags here')
+        if tags:
+            self.tags.setText(', '.join(tag if tag else '' for tag in tags))
 
         # Back button
         self.back_button = QtWidgets.QPushButton('← Back')
@@ -170,12 +161,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.create_window.setLayout(layout)
 
         # Connecting buttons
-        self.accept_button.clicked.connect(self.click_accept_button)
+        if is_update:
+            self.accept_button.clicked.connect(
+                self.click_accept_and_update_button
+            )
+        else:
+            self.accept_button.clicked.connect(
+                self.click_accept_and_save_button
+            )
         self.back_button.clicked.connect(self.click_back_button)
 
         self.stack.setCurrentWidget(self.create_window)
 
-    def click_accept_button(self):
+    def click_accept_and_save_button(self):
         note = {
                 'title': self.title.text(),
                 'text': self.text.toPlainText(),
@@ -187,13 +185,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.refresh_notes(note)
         self.stack.setCurrentWidget(self.window)
 
+    def click_accept_and_update_button(self):
+        ...
+
     def click_back_button(self):
         self.stack.setCurrentWidget(self.window)
 
     def load_notes(self):
         data = self.db.get_all_data_from_db()
         return data
-
 
 if __name__ == '__main__':
     db = ManageDb()
