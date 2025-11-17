@@ -40,7 +40,8 @@ class ManageDb:
             print(f'Error occured: \n {e}')
 
     def insert_tags_into_table(self, cursor, tags: list):
-        """Insert data into tag table.
+        """Insert tags into tag table. Just insert new tags
+        and get all id for these tags.
 
         cursor argument need for consistency:
         If the tag insertion fails, the connection should rollback().
@@ -52,15 +53,15 @@ class ManageDb:
                 insert_tag_data, [(tag,) for tag in tags if tag != '']
             )
 
-            # Get data from db
+            # Get tags from db
             join_tags = ','.join('?' for _ in tags)
             select_data_from_tag = (
                 f'SELECT id, name FROM tag WHERE name IN ({join_tags});'
             )
             cursor.execute(select_data_from_tag, tags)
             get_data_from_tag = cursor.fetchall()
-            tag_ids: list = [data[0] for data in get_data_from_tag]
-            return tag_ids
+            tag_map: dict = {name: tid for tid, name in get_data_from_tag}
+            return tag_map
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
@@ -70,7 +71,7 @@ class ManageDb:
                 cursor = conn.cursor()
 
                 # Insert data into tag table
-                list_id_tags = self.insert_tags_into_table(cursor, tags)
+                tag_map = self.insert_tags_into_table(cursor, tags)
 
                 # Insert data into note table
                 insert_data_note = (
@@ -80,13 +81,14 @@ class ManageDb:
                 note_last_row_id = cursor.lastrowid
 
                 # Insert data into intermediate table note_tag
-                insert_data_note_tag = (
-                    'INSERT INTO note_tag(tag_id, note_id) VALUES(?, ?);'
-                )
-                cursor.executemany(
-                    insert_data_note_tag,
-                    ([(tag_id, note_last_row_id) for tag_id in list_id_tags])
-                )
+                if tag_map:
+                    insert_data_note_tag = (
+                        'INSERT INTO note_tag(tag_id, note_id) VALUES(?, ?);'
+                    )
+                    cursor.executemany(
+                        insert_data_note_tag,
+                        [(tag_id, note_last_row_id) for tag_id in tag_map.values()]
+                    )
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
@@ -127,17 +129,49 @@ class ManageDb:
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
-    # def update_data(self, title, text, tags):
-    #     try:
-    #         with self.connect_to_db() as conn:
-    #             cursor = conn.cursor()
-    #             statement = '''
-    #                 UPDATE '''
-    #             cursor.execute(statement, (note_title,))
-    #             data = cursor.fetchall()
-    #             return data
-    #     except sqlite3.Error as e:
-    #         print(f'Error occured: \n {e}')
+    def update_data(self, updated_title, new_title, text, tags):
+        try:
+            with self.connect_to_db() as conn:
+                cursor = conn.cursor()
+                tag_map = self.insert_tags_into_table(cursor, tags)
+                get_note_id = cursor.execute(
+                    'SELECT id FROM note WHERE title=?',
+                    (updated_title,)
+                ).fetchone()
+                note_id = get_note_id[0]
+
+                statement = '''
+                    UPDATE note
+                    SET title=?, text=?
+                    WHERE id=?'''
+                
+                cursor.execute(statement, (new_title, text, note_id))
+
+                # Refresh intermediate table
+                cursor.execute(
+                    'SELECT tag_id FROM note_tag WHERE note_id=?',
+                    (note_id,)
+                )
+                current_tag_ids = {row[0] for row in cursor.fetchall()}
+
+                if tag_map:
+                    new_tag_ids = {tag_map[tag] for tag in tags}
+
+                    tags_to_add = new_tag_ids - current_tag_ids
+                    tags_to_remove = current_tag_ids - new_tag_ids
+                    if tags_to_add:
+                        cursor.executemany(
+                            'INSERT INTO note_tag (note_id, tag_id) VALUES (?, ?)',
+                            [(note_id, tid) for tid in tags_to_add]
+                        )
+                    if tags_to_remove:
+                        cursor.executemany(
+                            "DELETE FROM note_tag WHERE note_id = ? AND tag_id = ?",
+                            [(note_id, tid) for tid in tags_to_remove]
+                        )
+
+        except sqlite3.Error as e:
+            print(f'Error occured: \n {e}')
 
 
 if __name__ == '__main__':
@@ -148,4 +182,5 @@ if __name__ == '__main__':
     tags = ['#history', '#programming', '#hashtag']
     # init_db.insert_data_in_tables(title, text, tags)
     # init_db.show_data('ThirdNote')
-    print(init_db.get_all_data_from_db())
+    # print(init_db.get_all_data_from_db())
+    init_db.update_data('ThirdNoteNew', 'ThirdNoteNew2', 'tesxt', ['#python', '#C++'])

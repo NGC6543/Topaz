@@ -130,6 +130,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.title = QtWidgets.QLineEdit()
         self.title.setPlaceholderText('Enter title')
         if title:
+            self.old_title = title
             self.title.setText(title)
 
         # Text field
@@ -186,12 +187,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.setCurrentWidget(self.window)
 
     def click_accept_and_update_button(self):
-        ...
+        note = {
+                'title': self.title.text(),
+                'text': self.text.toPlainText(),
+                'tags': rsplit(r'[,|\s|,\s]', self.tags.text())
+        }
+        self.db.update_data(
+            self.old_title, note['title'], note['text'], note['tags']
+        )
+        self.notes.pop(note['title'], None)
+        self.refresh_notes(note)
+        self.stack.setCurrentWidget(self.window)
 
     def click_back_button(self):
         self.stack.setCurrentWidget(self.window)
 
-    def load_notes(self):
+    def load_notes(self) -> dict:
         data = self.db.get_all_data_from_db()
         return data
 
