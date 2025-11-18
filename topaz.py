@@ -32,31 +32,34 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def adding_data_into_widget(self, note):
         '''Add data into VBox Layout. Then it'll add to a grid.'''
-        notes_box = QtWidgets.QVBoxLayout()
-        test_button = QtWidgets.QPushButton()
-        test_button.setFixedWidth(100)
-        test_button.setFixedHeight(100)
-        test_button.title = note[0]
-        test_button.text = note[1][0]
-        test_button.tags = note[1][1]
-        test_button.setText(f'{note[0]}\n\n {note[1][0]}')
-        test_button.setStyleSheet("""
+        box = QtWidgets.QWidget()
+
+        notes_box = QtWidgets.QVBoxLayout(box)
+        note_button = QtWidgets.QPushButton()
+        note_button.setFixedWidth(100)
+        note_button.setFixedHeight(100)
+        note_button.title = note[0]
+        note_button.text = note[1][0]
+        note_button.tags = note[1][1]
+        note_button.setText(f'{note[0]}\n\n {note[1][0]}')
+        note_button.setStyleSheet("""
             QPushButton {
                 background-color: white;
                 border: 2px solid #4CAF50;
                 border-radius: 12px;
                 text-align: left;
                 padding: 4px 8px;
-            }
-        """)
+            }"""
+        )
 
-        notes_box.addWidget(test_button)
-        test_button.clicked.connect(self.show_single_note)
-        return notes_box
+        notes_box.addWidget(note_button)
+        note_button.clicked.connect(self.show_single_note)
+        return box
 
     def show_single_note(self):
-        '''Function must update db not insert new data'''
+        '''Show note to user; user can update note.'''
         sender = self.sender()
+        self.editing_button = sender
         self.create_note(
             sender.title, sender.text, sender.tags, is_update=True
         )
@@ -94,7 +97,12 @@ class MainWindow(QtWidgets.QMainWindow):
         for i, note in enumerate(self.notes.items()):
             r, c = divmod(i, self.cols)
             notes_box = self.adding_data_into_widget(note)
-            self.notes_grid.addItem(notes_box, r, c)
+
+            button = notes_box.layout().itemAt(0).widget()
+            button.grid_r = r
+            button.grid_c = c
+
+            self.notes_grid.addWidget(notes_box, r, c)
         return notes_box, r, c
 
     def refresh_notes(self, data):
@@ -109,7 +117,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         notes_box, r, c = self.add_item_to_grid()
 
-        self.notes_grid.addLayout(notes_box, r, c)
+        self.notes_grid.addWidget(notes_box, r, c)
 
     def create_note(self, title=None, text=None, tags=None, is_update=False):
         self.create_window = QtWidgets.QWidget()
@@ -130,6 +138,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.title = QtWidgets.QLineEdit()
         self.title.setPlaceholderText('Enter title')
         if title:
+            self.old_title = title
             self.title.setText(title)
 
         # Text field
@@ -186,12 +195,29 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.setCurrentWidget(self.window)
 
     def click_accept_and_update_button(self):
-        ...
+        note = {
+                'title': self.title.text(),
+                'text': self.text.toPlainText(),
+                'tags': rsplit(r'[, |,|\s|,\s]', self.tags.text())
+        }
+        self.db.update_data(
+            self.old_title, note['title'], note['text'], note['tags']
+        )
+
+        # ADD GETTING DATA FROM DB for consistency
+        button = self.editing_button
+        
+        button.title = note['title']
+        button.text = note['text']
+        button.tags = note['tags']
+        button.setText(f"{button.title}\n\n{button.text}")
+
+        self.stack.setCurrentWidget(self.window)
 
     def click_back_button(self):
         self.stack.setCurrentWidget(self.window)
 
-    def load_notes(self):
+    def load_notes(self) -> dict:
         data = self.db.get_all_data_from_db()
         return data
 
