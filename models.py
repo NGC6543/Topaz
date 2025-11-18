@@ -138,6 +138,9 @@ class ManageDb:
                     'SELECT id FROM note WHERE title=?',
                     (updated_title,)
                 ).fetchone()
+                # It must be impossible that updated_title doesnt exists
+                if not get_note_id:
+                    return 'Cannot update'
                 note_id = get_note_id[0]
 
                 statement = '''
@@ -155,7 +158,7 @@ class ManageDb:
                 current_tag_ids = {row[0] for row in cursor.fetchall()}
 
                 if tag_map:
-                    new_tag_ids = {tag_map[tag] for tag in tags}
+                    new_tag_ids = {tag_map[tag] for tag in tags if tag != ''}
 
                     tags_to_add = new_tag_ids - current_tag_ids
                     tags_to_remove = current_tag_ids - new_tag_ids
