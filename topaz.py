@@ -9,6 +9,8 @@ from models import ManageDb
 
 
 NOTES_JSON_FILE = 'notes.json'
+HEIGHT_OF_WINDOW = 600
+WIDTH_OF_WINDOW = 400
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -20,15 +22,34 @@ class MainWindow(QtWidgets.QMainWindow):
         self.initializeUI()
 
     def initializeUI(self):
-        self.setGeometry(300, 300, 400, 300)
         self.setWindowTitle("Topaz")
+        # self.setGeometry(300, 300, 400, 300)
+        # Set fixed size of the window
+        self.setFixedWidth(WIDTH_OF_WINDOW)
+        self.setFixedHeight(HEIGHT_OF_WINDOW)
 
+        self.scroll = QtWidgets.QScrollArea()
         self.stack = QtWidgets.QStackedWidget()
-        self.setCentralWidget(self.stack)
+        
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setWidget(self.stack)
+        
+        self.setCentralWidget(self.scroll)
 
         self.show_main_window()
 
         self.show()
+
+        self.center_window()
+
+    def center_window(self):
+        'Move the window to the center.'
+        screen = QtGui.QGuiApplication.primaryScreen()
+        center_point = screen.availableGeometry().center()
+
+        frame = self.frameGeometry()
+        frame.moveCenter(center_point)
+        self.move(frame.topLeft())
 
     def adding_data_into_widget(self, note):
         '''Add data into VBox Layout. Then it'll add to a grid.'''
@@ -106,8 +127,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return notes_box, r, c
 
     def refresh_notes(self, data):
-        # for i in reversed(range(self.notes_grid.count())): # Reversed?
-        for i in range(self.notes_grid.count()):
+        for i in reversed(range(self.notes_grid.count())):
             widget = self.notes_grid.itemAt(i).widget()
             if widget:
                 self.notes_grid.removeWidget(widget)
