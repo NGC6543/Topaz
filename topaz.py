@@ -28,18 +28,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setFixedWidth(WIDTH_OF_WINDOW)
         self.setFixedHeight(HEIGHT_OF_WINDOW)
 
-        self.scroll = QtWidgets.QScrollArea()
         self.stack = QtWidgets.QStackedWidget()
         
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setWidget(self.stack)
-        
-        self.setCentralWidget(self.scroll)
+        self.setCentralWidget(self.stack)
 
         self.show_main_window()
 
         self.show()
-
         self.center_window()
 
     def center_window(self):
@@ -86,10 +81,13 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
     def show_main_window(self):
+        'Display main window with all notes.'
         self.notes = self.load_notes()
 
+        self.scroll_main_window = QtWidgets.QScrollArea()
         self.window = QtWidgets.QWidget()
-        self.stack.addWidget(self.window)
+        self.stack.addWidget(self.scroll_main_window)
+        # self.stack.addWidget(self.window)
 
         self.main_box = QtWidgets.QVBoxLayout()
         self.notes_grid = QtWidgets.QGridLayout()
@@ -111,7 +109,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.create_button.clicked.connect(self.create_note)
 
-        self.stack.setCurrentWidget(self.window)
+        self.scroll_main_window.setWidgetResizable(True)
+        self.scroll_main_window.setWidget(self.window)
+
+        self.stack.setCurrentWidget(self.scroll_main_window)
 
     def add_item_to_grid(self):
         notes_box, r, c = None, None, None
@@ -119,11 +120,14 @@ class MainWindow(QtWidgets.QMainWindow):
             r, c = divmod(i, self.cols)
             notes_box = self.adding_data_into_widget(note)
 
+            # Coordinates for editing note
             button = notes_box.layout().itemAt(0).widget()
             button.grid_r = r
             button.grid_c = c
 
-            self.notes_grid.addWidget(notes_box, r, c)
+            self.notes_grid.addWidget(
+                notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
+            )
         return notes_box, r, c
 
     def refresh_notes(self, data):
@@ -137,7 +141,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         notes_box, r, c = self.add_item_to_grid()
 
-        self.notes_grid.addWidget(notes_box, r, c)
+        self.notes_grid.addWidget(
+            notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
+        )
 
     def create_note(self, title=None, text=None, tags=None, is_update=False):
         self.create_window = QtWidgets.QWidget()
@@ -232,10 +238,10 @@ class MainWindow(QtWidgets.QMainWindow):
         button.tags = note['tags']
         button.setText(f"{button.title}\n\n{button.text}")
 
-        self.stack.setCurrentWidget(self.window)
+        self.stack.setCurrentWidget(self.scroll_main_window)
 
     def click_back_button(self):
-        self.stack.setCurrentWidget(self.window)
+        self.stack.setCurrentWidget(self.scroll_main_window)
 
     def load_notes(self) -> dict:
         data = self.db.get_all_data_from_db()
