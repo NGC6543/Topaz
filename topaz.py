@@ -13,6 +13,40 @@ HEIGHT_OF_WINDOW = 600
 WIDTH_OF_WINDOW = 400
 
 
+class NoteButton(QtWidgets.QPushButton):
+    requestDelete = QtCore.pyqtSignal(int, str)
+
+    def __init__(self, note_id, title, preview_text, tags, parent=None):
+        super().__init__(parent)
+
+        self.note_id = note_id
+        self.title = title
+        self.preview_text = preview_text
+        self.tags = tags
+
+        self.setFixedWidth(100)
+        self.setFixedHeight(100)
+        self.setText(f"{title}\n\n{preview_text}")
+
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: white;
+                border: 2px solid #4CAF50;
+                border-radius: 12px;
+                text-align: left;
+                padding: 4px 8px;
+            }
+        """)
+
+    def contextMenuEvent(self, event):
+        menu = QtWidgets.QMenu(self)
+        delete_action = menu.addAction("Delete")
+        action = menu.exec(event.globalPos())
+
+        if action == delete_action:
+            self.requestDelete.emit(self.note_id, self.title)
+
+
 class MainWindow(QtWidgets.QMainWindow):
     '''Main window.'''
     def __init__(self, db):
@@ -29,7 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setFixedHeight(HEIGHT_OF_WINDOW)
 
         self.stack = QtWidgets.QStackedWidget()
-        
+
         self.setCentralWidget(self.stack)
 
         self.show_main_window()
@@ -51,25 +85,21 @@ class MainWindow(QtWidgets.QMainWindow):
         box = QtWidgets.QWidget()
 
         notes_box = QtWidgets.QVBoxLayout(box)
-        note_button = QtWidgets.QPushButton()
-        note_button.setFixedWidth(100)
-        note_button.setFixedHeight(100)
-        note_button.title = note[0]
-        note_button.text = note[1][0]
-        note_button.tags = note[1][1]
-        note_button.setText(f'{note[0]}\n\n {note[1][0]}')
-        note_button.setStyleSheet("""
-            QPushButton {
-                background-color: white;
-                border: 2px solid #4CAF50;
-                border-radius: 12px;
-                text-align: left;
-                padding: 4px 8px;
-            }"""
-        )
+        note_id = note[0]
+        title = note[1][0]
+        text = note[1][1]
+        tags = note[1][2]
+        note_button = NoteButton(note_id, title, text, tags)
 
-        notes_box.addWidget(note_button)
+        # Adding propertis for editing note
+        note_button.note_id = note[0]
+        note_button.title = note[1][0]
+        note_button.text = note[1][1]
+        note_button.tags = note[1][2]
+
         note_button.clicked.connect(self.show_single_note)
+        note_button.requestDelete.connect(self.confirm_delete_note)
+        notes_box.addWidget(note_button)
         return box
 
     def show_single_note(self):
@@ -80,14 +110,36 @@ class MainWindow(QtWidgets.QMainWindow):
             sender.title, sender.text, sender.tags, is_update=True
         )
 
+    def confirm_delete_note(self, note_id, title):
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            'Delete note',
+            f"Are you sure you want to delete note '{title}'?",
+            QtWidgets.QMessageBox.StandardButton.Yes |
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            self.db.delete_note(note_id)
+
+            r, c = self.coord[note_id]
+
+            wd = self.notes_grid.itemAtPosition(r, c).widget()
+            self.notes_grid.removeWidget(wd)
+            wd.deleteLater()
+
+            self.notes.pop(note_id)
+            self.coord.pop(note_id)
+            self.refresh_notes()
+
     def show_main_window(self):
         'Display main window with all notes.'
         self.notes = self.load_notes()
+        self.coord = {}
 
         self.scroll_main_window = QtWidgets.QScrollArea()
         self.window = QtWidgets.QWidget()
         self.stack.addWidget(self.scroll_main_window)
-        # self.stack.addWidget(self.window)
 
         self.main_box = QtWidgets.QVBoxLayout()
         self.notes_grid = QtWidgets.QGridLayout()
@@ -119,25 +171,22 @@ class MainWindow(QtWidgets.QMainWindow):
         for i, note in enumerate(self.notes.items()):
             r, c = divmod(i, self.cols)
             notes_box = self.adding_data_into_widget(note)
-
-            # Coordinates for editing note
-            button = notes_box.layout().itemAt(0).widget()
-            button.grid_r = r
-            button.grid_c = c
+            self.coord[note[0]] = (r, c)
 
             self.notes_grid.addWidget(
                 notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
             )
         return notes_box, r, c
 
-    def refresh_notes(self, data):
+    def refresh_notes(self, data=None):
         for i in reversed(range(self.notes_grid.count())):
             widget = self.notes_grid.itemAt(i).widget()
             if widget:
                 self.notes_grid.removeWidget(widget)
                 widget.deleteLater()
 
-        self.notes[data['title']] = (data['text'], data['tags'])
+        if data:
+            self.notes[data['note_id']] = (data['title'], data['text'], data['tags'])
 
         notes_box, r, c = self.add_item_to_grid()
 
@@ -214,11 +263,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 'text': self.text.toPlainText(),
                 'tags': rsplit(r'[,|\s|,\s]', self.tags.text())
         }
-        self.db.insert_data_in_tables(
+        adding_data_and_get_id = self.db.insert_data_in_tables(
             note['title'], note['text'], note['tags']
         )
+        note['note_id'] = adding_data_and_get_id
         self.refresh_notes(note)
-        self.stack.setCurrentWidget(self.window)
+        self.stack.setCurrentWidget(self.scroll_main_window)
 
     def click_accept_and_update_button(self):
         note = {
@@ -232,7 +282,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # ADD GETTING DATA FROM DB for consistency
         button = self.editing_button
-        
+
         button.title = note['title']
         button.text = note['text']
         button.tags = note['tags']
