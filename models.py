@@ -20,7 +20,7 @@ class ManageDb:
                 tag_id INTEGER,
                 note_id INTEGER,
                 PRIMARY KEY (tag_id, note_id),
-                FOREIGN KEY (tag_id) REFERENCES tag (id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES tag (id),
                 FOREIGN KEY (note_id) REFERENCES note (id) ON DELETE CASCADE
                 );''',
             '''CREATE TABLE IF NOT EXISTS note (
@@ -87,8 +87,11 @@ class ManageDb:
                     )
                     cursor.executemany(
                         insert_data_note_tag,
-                        [(tag_id, note_last_row_id) for tag_id in tag_map.values()]
+                        [
+                            (tag_id, note_last_row_id) for tag_id in tag_map.values()
+                        ]
                     )
+                return note_last_row_id
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
@@ -107,8 +110,10 @@ class ManageDb:
             data_from_db = cursor.fetchall()
 
             db_dict = {}
-            for _, title, text, tags in data_from_db:
-                db_dict[title] = (text, tags.split(',') if tags else [])
+            for note_id, title, text, tags in data_from_db:
+                db_dict[note_id] = (
+                    title, text, tags.split(',') if tags else []
+                )
             return db_dict
 
         except sqlite3.Error as e:
@@ -147,7 +152,7 @@ class ManageDb:
                     UPDATE note
                     SET title=?, text=?
                     WHERE id=?'''
-                
+
                 cursor.execute(statement, (new_title, text, note_id))
 
                 # Refresh intermediate table
@@ -172,7 +177,18 @@ class ManageDb:
                             "DELETE FROM note_tag WHERE note_id = ? AND tag_id = ?",
                             [(note_id, tid) for tid in tags_to_remove]
                         )
+        except sqlite3.Error as e:
+            print(f'Error occured: \n {e}')
 
+    def delete_note(self, note_id):
+        try:
+            with self.connect_to_db() as conn:
+                cursor = conn.cursor()
+                statement = '''
+                    DELETE FROM note
+                    WHERE id=(?);'''
+                cursor.execute(statement, (note_id,))
+                return True
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
@@ -185,5 +201,5 @@ if __name__ == '__main__':
     tags = ['#history', '#programming', '#hashtag']
     # init_db.insert_data_in_tables(title, text, tags)
     # init_db.show_data('ThirdNote')
-    # print(init_db.get_all_data_from_db())
-    init_db.update_data('ThirdNoteNew', 'ThirdNoteNew2', 'tesxt', ['#python', '#C++'])
+    print(init_db.get_all_data_from_db())
+    # init_db.update_data('ThirdNoteNew', 'ThirdNoteNew2', 'tesxt', ['#python', '#C++'])
