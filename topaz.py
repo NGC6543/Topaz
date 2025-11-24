@@ -114,7 +114,7 @@ class MainWindow(QtWidgets.QMainWindow):
         reply = QtWidgets.QMessageBox.question(
             self,
             'Delete note',
-            f"Are you sure you want to delete note '{title}'?",
+            f'Are you sure you want to delete note "{title}"?',
             QtWidgets.QMessageBox.StandardButton.Yes |
             QtWidgets.QMessageBox.StandardButton.No
         )
@@ -186,7 +186,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 widget.deleteLater()
 
         if data:
-            self.notes[data['note_id']] = (data['title'], data['text'], data['tags'])
+            self.notes[data['note_id']] = (
+                data['title'], data['text'], data['tags']
+            )
 
         notes_box, r, c = self.add_item_to_grid()
 
@@ -212,8 +214,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Title field
         self.title = QtWidgets.QLineEdit()
         self.title.setPlaceholderText('Enter title')
+        self.old_title = title
         if title:
-            self.old_title = title
             self.title.setText(title)
 
         # Text field
@@ -258,9 +260,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.setCurrentWidget(self.create_window)
 
     def click_accept_and_save_button(self):
+        title = self.title.text()
+        text = self.text.toPlainText()
+        if not title and not text:
+            return
         note = {
-                'title': self.title.text(),
-                'text': self.text.toPlainText(),
+                'title': title,
+                'text': text,
                 'tags': rsplit(r'[,|\s|,\s]', self.tags.text())
         }
         adding_data_and_get_id = self.db.insert_data_in_tables(
@@ -271,18 +277,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.setCurrentWidget(self.scroll_main_window)
 
     def click_accept_and_update_button(self):
+        button = self.editing_button
         note = {
                 'title': self.title.text(),
                 'text': self.text.toPlainText(),
                 'tags': rsplit(r'[, |,|\s|,\s]', self.tags.text())
         }
         self.db.update_data(
-            self.old_title, note['title'], note['text'], note['tags']
+            button.note_id, note['title'], note['text'], note['tags']
         )
 
-        # ADD GETTING DATA FROM DB for consistency
-        button = self.editing_button
-
+        # ADD GETTING DATA FROM DB for consistency?
         button.title = note['title']
         button.text = note['text']
         button.tags = note['tags']
@@ -296,6 +301,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def load_notes(self) -> dict:
         data = self.db.get_all_data_from_db()
         return data
+
 
 if __name__ == '__main__':
     db = ManageDb()

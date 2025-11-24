@@ -134,19 +134,18 @@ class ManageDb:
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
-    def update_data(self, updated_title, new_title, text, tags):
+    def update_data(self, note_id, new_title, text, tags):
         try:
             with self.connect_to_db() as conn:
                 cursor = conn.cursor()
                 tag_map = self.insert_tags_into_table(cursor, tags)
                 get_note_id = cursor.execute(
-                    'SELECT id FROM note WHERE title=?',
-                    (updated_title,)
+                    'SELECT id FROM note WHERE id=?',
+                    (note_id,)
                 ).fetchone()
                 # It must be impossible that updated_title doesnt exists
                 if not get_note_id:
                     return 'Cannot update'
-                note_id = get_note_id[0]
 
                 statement = '''
                     UPDATE note
