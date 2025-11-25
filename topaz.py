@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from re import split as rsplit
 
 from PyQt6 import QtGui
@@ -28,15 +29,8 @@ class NoteButton(QtWidgets.QPushButton):
         self.setFixedHeight(100)
         self.setText(f"{title}\n\n{preview_text}")
 
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: white;
-                border: 2px solid #4CAF50;
-                border-radius: 12px;
-                text-align: left;
-                padding: 4px 8px;
-            }
-        """)
+        # Set name for using in style.qss
+        self.setObjectName('note_button')
 
     def contextMenuEvent(self, event):
         menu = QtWidgets.QMenu(self)
@@ -146,6 +140,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.create_button = QtWidgets.QPushButton('Create note')
         self.create_button.setFixedWidth(200)
+        self.create_button.setObjectName('create_button')
+
         self.main_box.addWidget(
             self.create_button,
             alignment=QtCore.Qt.AlignmentFlag.AlignCenter
@@ -205,11 +201,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Accept_button
         self.accept_button = QtWidgets.QPushButton()
-        self.accept_button.setFixedWidth(50)
+        self.accept_button.setObjectName('accept_button')
         self.accept_button.setIcon(QtGui.QIcon('check-mark2.png'))
         self.accept_button.setIconSize(QtCore.QSize(24, 24))
-        self.accept_button.setFixedHeight(40)
-        self.accept_button.setStyleSheet('border: 0px;')
 
         # Title field
         self.title = QtWidgets.QLineEdit()
@@ -217,23 +211,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.old_title = title
         if title:
             self.title.setText(title)
+        self.title.setObjectName('title_edit')
 
         # Text field
         self.text = QtWidgets.QTextEdit()
         self.text.setPlaceholderText('Enter note text here')
         if text:
             self.text.setText(text)
+        self.text.setObjectName('text_edit')
 
         # Tags field
         self.tags = QtWidgets.QLineEdit()
         self.tags.setPlaceholderText('Enter note tags here')
         if tags:
             self.tags.setText(', '.join(tag if tag else '' for tag in tags))
+        self.tags.setObjectName('tags_edit')
 
         # Back button
         self.back_button = QtWidgets.QPushButton('← Back')
-        self.back_button.setFixedHeight(40)
-        self.back_button.setStyleSheet('border: 0px;')
+        self.back_button.setObjectName('back_button')
 
         # Managing layout
         layout_for_buttons.addStretch()
@@ -243,7 +239,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self.title)
         layout.addWidget(self.tags)
         layout.addWidget(self.text)
-        layout.addStretch()
+        # layout.addStretch()
         self.create_window.setLayout(layout)
 
         # Connecting buttons
@@ -307,5 +303,6 @@ if __name__ == '__main__':
     db = ManageDb()
     db.create_tables() # Later hide this in some script
     app = QtWidgets.QApplication(sys.argv)
+    app.setStyleSheet(Path('style.qss').read_text())
     window = MainWindow(db)
     app.exec()
