@@ -305,7 +305,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     db = ManageDb()
-    db.create_tables() # Late hide this in some script
+    db.create_tables() # Later hide this in some script
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow(db)
     app.exec()
