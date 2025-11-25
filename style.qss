@@ -1,0 +1,64 @@
+/* QWidget {
+    background-color: #126e90;
+} */
+
+/*
+    Buttons
+*/
+QPushButton#note_button,
+QPushButton#create_button {
+    background-color: white;
+    border: 1px solid #4CAF50;
+    border-radius: 12px;
+    padding: 4px 8px;
+    text-align: left;
+}
+
+QPushButton#create_button {
+    border-color: #1daf9c;
+    text-align: center;
+}
+
+QPushButton#note_button:hover,
+QPushButton#create_button:hover {
+    border-width: 2px;
+}
+
+QPushButton#accept_button,
+QPushButton#back_button {
+    border: 0px;
+    width: 50px;
+    height: 40px;
+    padding: 0px;
+    background: transparent;
+}
+
+QPushButton#accept_button:hover,
+QPushButton#back_button:hover {
+    background-color: rgba(0, 0, 0, 20); /* Optional hover */
+    border-radius: 6px;
+}
+/*
+    QEdits
+*/
+QLineEdit#title_edit,
+QLineEdit#tags_edit,
+QTextEdit#text_edit {
+    background-color: white;
+    border: 0px;
+    border-radius: 12px;
+    padding: 4px 8px;
+    text-align: left;
+}
+
+QLineEdit#title_edit:hover,
+QLineEdit#tags_edit:hover,
+QTextEdit#text_edit:hover {
+    border: 1px solid green;
+}
+
+QLineEdit#title_edit:focus,
+QLineEdit#tags_edit:focus,
+QTextEdit#text_edit:focus {
+    border: 1px solid #4CAF50;
+}

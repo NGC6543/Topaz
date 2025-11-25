@@ -8,28 +8,29 @@ class ManageDb:
         ...
 
     def connect_to_db(self):
-        return sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(DB_NAME)
+        conn.execute("PRAGMA foreign_keys = ON;")
+        return conn
 
     def create_tables(self):
         sql_statements = [
+            '''CREATE TABLE IF NOT EXISTS note (
+                id INTEGER PRIMARY KEY,
+                title VARCHAR(24),
+                text TEXT,
+                created_at datetime default current_timestamp
+                );''',
             '''CREATE TABLE IF NOT EXISTS tag (
                 id INTEGER PRIMARY KEY,
                 name VARCHAR(24) UNIQUE
                 );''',
             '''CREATE TABLE IF NOT EXISTS note_tag (
-                tag_id INTEGER,
                 note_id INTEGER,
-                PRIMARY KEY (tag_id, note_id),
-                FOREIGN KEY (tag_id) REFERENCES tag (id),
-                FOREIGN KEY (note_id) REFERENCES note (id) ON DELETE CASCADE
+                tag_id INTEGER,
+                FOREIGN KEY (note_id) REFERENCES note (id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES tag (id) ON DELETE CASCADE,
+                UNIQUE (note_id, tag_id)
                 );''',
-            '''CREATE TABLE IF NOT EXISTS note (
-                id INTEGER PRIMARY KEY,
-                title VARCHAR(24),
-                text TEXT,
-                FOREIGN KEY (id) REFERENCES note_tag (note_id)
-                );'''
-
         ]
         try:
             with self.connect_to_db() as conn:
@@ -105,7 +106,8 @@ class ManageDb:
                     FROM note n
                     LEFT JOIN note_tag nt ON n.id = nt.note_id
                     LEFT JOIN tag t ON t.id = nt.tag_id
-                    GROUP BY n.id;'''
+                    GROUP BY n.id
+                    ORDER BY created_at;'''
             cursor.execute(statement)
             data_from_db = cursor.fetchall()
 
@@ -120,6 +122,7 @@ class ManageDb:
             print(f'Error occured: \n {e}')
 
     def show_data(self, note_title):
+        'DEPRICATED?'
         try:
             with self.connect_to_db() as conn:
                 cursor = conn.cursor()
@@ -127,26 +130,26 @@ class ManageDb:
                     SELECT n.title, n.text, t.name FROM note n
                     LEFT JOIN note_tag nt ON (n.id=nt.note_id)
                     LEFT JOIN tag t ON (t.id=nt.tag_id)
-                    WHERE n.title=(?);'''
+                    WHERE n.title=(?)
+                    ORDER BY created_at;'''
                 cursor.execute(statement, (note_title,))
                 data = cursor.fetchall()
                 return data
         except sqlite3.Error as e:
             print(f'Error occured: \n {e}')
 
-    def update_data(self, updated_title, new_title, text, tags):
+    def update_data(self, note_id, new_title, text, tags):
         try:
             with self.connect_to_db() as conn:
                 cursor = conn.cursor()
                 tag_map = self.insert_tags_into_table(cursor, tags)
                 get_note_id = cursor.execute(
-                    'SELECT id FROM note WHERE title=?',
-                    (updated_title,)
+                    'SELECT id FROM note WHERE id=?',
+                    (note_id,)
                 ).fetchone()
                 # It must be impossible that updated_title doesnt exists
                 if not get_note_id:
                     return 'Cannot update'
-                note_id = get_note_id[0]
 
                 statement = '''
                     UPDATE note
