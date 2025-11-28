@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 from pathlib import Path
 from re import split as rsplit
 
@@ -192,6 +193,7 @@ class MainWindow(QtWidgets.QMainWindow):
             notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
         )
 
+
     def create_note(self, title=None, text=None, tags=None, is_update=False):
         self.create_window = QtWidgets.QWidget()
         self.stack.addWidget(self.create_window)
@@ -212,13 +214,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if title:
             self.title.setText(title)
         self.title.setObjectName('title_edit')
+        self.title.textChanged.connect(self.on_title_changed)
 
-        # Text field
-        self.text = QtWidgets.QTextEdit()
-        self.text.setPlaceholderText('Enter note text here')
-        if text:
-            self.text.setText(text)
-        self.text.setObjectName('text_edit')
+        # Time Label
+        cur_time = datetime.today().strftime('%d-%B-%Y %H:%M')
+        self.time_label = QtWidgets.QLabel(cur_time)
+        self.time_label.setObjectName('time_label')
 
         # Tags field
         self.tags = QtWidgets.QLineEdit()
@@ -226,6 +227,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if tags:
             self.tags.setText(', '.join(tag if tag else '' for tag in tags))
         self.tags.setObjectName('tags_edit')
+
+        # Text field
+        self.text = QtWidgets.QTextEdit()
+        self.text.setPlaceholderText('Enter note text here')
+        if text:
+            self.text.setText(text)
+        self.text.setObjectName('text_edit')
 
         # Back button
         self.back_button = QtWidgets.QPushButton('← Back')
@@ -237,6 +245,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout_for_buttons.addWidget(self.accept_button)
         layout.addLayout(layout_for_buttons)
         layout.addWidget(self.title)
+        layout.addWidget(self.time_label)
         layout.addWidget(self.tags)
         layout.addWidget(self.text)
         # layout.addStretch()
@@ -254,6 +263,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.back_button.clicked.connect(self.click_back_button)
 
         self.stack.setCurrentWidget(self.create_window)
+
+    def on_title_changed(self, text):
+        if text:
+            self.title.setStyleSheet("font-size: 14px; font-weight: bold;")
+        else:
+            self.title.setStyleSheet("font-size: 18px; font-weight: normal;")
 
     def click_accept_and_save_button(self):
         title = self.title.text()
