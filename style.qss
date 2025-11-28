@@ -47,8 +47,12 @@ QTextEdit#text_edit {
     background-color: white;
     border: 0px;
     border-radius: 12px;
-    padding: 4px 8px;
+    padding: 6px 8px;
     text-align: left;
+}
+QLineEdit#title_edit{
+    font-size: 18px;
+    padding: 6px 8px;
 }
 
 QLineEdit#title_edit:hover,
@@ -61,4 +65,12 @@ QLineEdit#title_edit:focus,
 QLineEdit#tags_edit:focus,
 QTextEdit#text_edit:focus {
     border: 1px solid #4CAF50;
+}
+
+QLabel#time_label {
+    color: #333;
+    padding: 6px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    font-style: italic;
 }
