@@ -102,7 +102,8 @@ class ManageDb:
                 cursor = conn.cursor()
                 statement = '''
                     SELECT n.id, n.title, n.text,
-                    GROUP_CONCAT(t.name, ',') AS tags
+                    GROUP_CONCAT(t.name, ',') AS tags,
+                    created_at
                     FROM note n
                     LEFT JOIN note_tag nt ON n.id = nt.note_id
                     LEFT JOIN tag t ON t.id = nt.tag_id
@@ -112,9 +113,9 @@ class ManageDb:
             data_from_db = cursor.fetchall()
 
             db_dict = {}
-            for note_id, title, text, tags in data_from_db:
+            for note_id, title, text, tags, created_at in data_from_db:
                 db_dict[note_id] = (
-                    title, text, tags.split(',') if tags else []
+                    title, text, tags.split(',') if tags else [], created_at
                 )
             return db_dict
 

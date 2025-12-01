@@ -91,6 +91,7 @@ class MainWindow(QtWidgets.QMainWindow):
         note_button.title = note[1][0]
         note_button.text = note[1][1]
         note_button.tags = note[1][2]
+        note_button.created_at = note[1][3]
 
         note_button.clicked.connect(self.show_single_note)
         note_button.requestDelete.connect(self.confirm_delete_note)
@@ -102,7 +103,8 @@ class MainWindow(QtWidgets.QMainWindow):
         sender = self.sender()
         self.editing_button = sender
         self.create_note(
-            sender.title, sender.text, sender.tags, is_update=True
+            sender.title, sender.text, sender.tags,
+            sender.created_at, is_update=True
         )
 
     def confirm_delete_note(self, note_id, title):
@@ -184,7 +186,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if data:
             self.notes[data['note_id']] = (
-                data['title'], data['text'], data['tags']
+                data['title'], data['text'], data['tags'], data['created_at']
             )
 
         notes_box, r, c = self.add_item_to_grid()
@@ -193,8 +195,7 @@ class MainWindow(QtWidgets.QMainWindow):
             notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
         )
 
-
-    def create_note(self, title=None, text=None, tags=None, is_update=False):
+    def create_note(self, title=None, text=None, tags=None, date=None, is_update=False):
         self.create_window = QtWidgets.QWidget()
         self.stack.addWidget(self.create_window)
 
@@ -217,7 +218,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.title.textChanged.connect(self.on_title_changed)
 
         # Time Label
-        cur_time = datetime.today().strftime('%d-%B-%Y %H:%M')
+        if date:
+            cur_time = date
+        else:
+            cur_time = datetime.today().strftime('%d-%B-%Y %H:%M')
         self.time_label = QtWidgets.QLabel(cur_time)
         self.time_label.setObjectName('time_label')
 
@@ -278,7 +282,8 @@ class MainWindow(QtWidgets.QMainWindow):
         note = {
                 'title': title,
                 'text': text,
-                'tags': rsplit(r'[,|\s|,\s]', self.tags.text())
+                'tags': rsplit(r'[,|\s|,\s]', self.tags.text()),
+                'created_at': None
         }
         adding_data_and_get_id = self.db.insert_data_in_tables(
             note['title'], note['text'], note['tags']
@@ -292,7 +297,8 @@ class MainWindow(QtWidgets.QMainWindow):
         note = {
                 'title': self.title.text(),
                 'text': self.text.toPlainText(),
-                'tags': rsplit(r'[, |,|\s|,\s]', self.tags.text())
+                'tags': rsplit(r'[, |,|\s|,\s]', self.tags.text()),
+                'created_at': self.time_label.text()
         }
         self.db.update_data(
             button.note_id, note['title'], note['text'], note['tags']
@@ -302,6 +308,7 @@ class MainWindow(QtWidgets.QMainWindow):
         button.title = note['title']
         button.text = note['text']
         button.tags = note['tags']
+        button.created_at = note['created_at']
         button.setText(f"{button.title}\n\n{button.text}")
 
         self.stack.setCurrentWidget(self.scroll_main_window)
