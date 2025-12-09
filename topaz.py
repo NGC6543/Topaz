@@ -1,3 +1,4 @@
+from ast import Return
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +41,14 @@ class NoteButton(QtWidgets.QPushButton):
 
         if action == delete_action:
             self.requestDelete.emit(self.note_id, self.title)
+
+    # def show(self):
+    #     "Show widget."
+    #     self.setVisible(True)
+
+    # def hide(self):
+    #     "Hide widget."
+    #     self.setVisible(False)
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -87,11 +96,17 @@ class MainWindow(QtWidgets.QMainWindow):
         note_button = NoteButton(note_id, title, text, tags)
 
         # Adding propertis for editing note
-        note_button.note_id = note[0]
-        note_button.title = note[1][0]
-        note_button.text = note[1][1]
-        note_button.tags = note[1][2]
+        note_button.note_id = note_id
+        note_button.title = title
+        note_button.text = text
+        note_button.tags = tags
         note_button.created_at = note[1][3]
+
+        # box.setObjectName(f"note_box_{note_id}")
+        box.setProperty("noteId", note_id)
+        box.setProperty("noteTitle", title)
+        box.setProperty("noteText", text)
+        box.setProperty("noteTags", tags)
 
         note_button.clicked.connect(self.show_single_note)
         note_button.requestDelete.connect(self.confirm_delete_note)
@@ -136,33 +151,39 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.scroll_main_window = QtWidgets.QScrollArea()
         self.window = QtWidgets.QWidget()
-        self.stack.addWidget(self.scroll_main_window)
+
+        # Search bar
+        self.search_bar = QtWidgets.QLineEdit()
+        self.search_bar.setObjectName('search_bar') # NEED ADD STYLE IN style.qss
 
         self.main_box = QtWidgets.QVBoxLayout()
         self.notes_grid = QtWidgets.QGridLayout()
 
+        # Create button
         self.create_button = QtWidgets.QPushButton('Create note')
         self.create_button.setFixedWidth(200)
         self.create_button.setObjectName('create_button')
-
-        self.main_box.addWidget(
-            self.create_button,
-            alignment=QtCore.Qt.AlignmentFlag.AlignCenter
-        )
 
         # Adding data into grid
         self.cols = 2
         self.add_item_to_grid()
 
+        self.main_box.addWidget(
+            self.create_button,
+            alignment=QtCore.Qt.AlignmentFlag.AlignCenter
+        )
+        self.main_box.addWidget(self.search_bar)
         self.main_box.addLayout(self.notes_grid)
         self.window.setLayout(self.main_box)
         self.main_box.addStretch()
 
         self.create_button.clicked.connect(self.create_note)
+        self.search_bar.textChanged.connect(self.update_display)
 
         self.scroll_main_window.setWidgetResizable(True)
         self.scroll_main_window.setWidget(self.window)
 
+        self.stack.addWidget(self.scroll_main_window)
         self.stack.setCurrentWidget(self.scroll_main_window)
 
     def add_item_to_grid(self):
@@ -170,6 +191,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for i, note in enumerate(self.notes.items()):
             r, c = divmod(i, self.cols)
             notes_box = self.adding_data_into_widget(note)
+            # For each note's id save its coordinate.
             self.coord[note[0]] = (r, c)
 
             self.notes_grid.addWidget(
@@ -191,11 +213,41 @@ class MainWindow(QtWidgets.QMainWindow):
 
         notes_box, r, c = self.add_item_to_grid()
 
-        self.notes_grid.addWidget(
-            notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
-        )
+        #REMOVE?
+        # self.notes_grid.addWidget(
+        #     notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
+        # )
 
-    def create_note(self, title=None, text=None, tags=None, date=None, is_update=False):
+    def update_display(self, text):
+        query = text.lower().strip()
+
+        visible_widgets = []
+        for i in range(self.notes_grid.count()):
+            container = self.notes_grid.itemAt(i).widget()
+
+            title = container.property("noteTitle") or ""
+            preview = container.property("noteText") or ""
+            tags = container.property("noteTags") or []
+
+            is_match = (
+                query in title.lower()
+                or query in preview.lower()
+                or any(query in t.lower() for t in tags)
+            )
+
+            container.setVisible(is_match)
+            if is_match:
+                visible_widgets.append(container)
+
+        self.search_bar.textChanged.disconnect(self.update_display)
+        # self.notes_grid.setSizeConstraint(self.main_box.SizeConstraint.SetFixedSize)
+        # self.notes_grid.setSizeConstraint(QtWidgets.minimumSize())
+        # self.main_box.SizeConstraint()
+        # self.refactor_grid(visible_widgets)
+
+    def create_note(
+            self, title=None, text=None, tags=None, date=None, is_update=False
+    ):
         self.create_window = QtWidgets.QWidget()
         self.stack.addWidget(self.create_window)
 
