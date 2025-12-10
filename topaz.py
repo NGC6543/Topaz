@@ -1,4 +1,3 @@
-from ast import Return
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -17,15 +16,16 @@ WIDTH_OF_WINDOW = 400
 
 
 class NoteButton(QtWidgets.QPushButton):
-    requestDelete = QtCore.pyqtSignal(int, str)
+    request_delete = QtCore.pyqtSignal(int, str)
 
-    def __init__(self, note_id, title, preview_text, tags, parent=None):
+    def __init__(self, note_id, title, preview_text, tags, created_at, parent=None):
         super().__init__(parent)
 
         self.note_id = note_id
         self.title = title
         self.preview_text = preview_text
         self.tags = tags
+        self.created_at = created_at
 
         self.setFixedWidth(100)
         self.setFixedHeight(100)
@@ -40,19 +40,11 @@ class NoteButton(QtWidgets.QPushButton):
         action = menu.exec(event.globalPos())
 
         if action == delete_action:
-            self.requestDelete.emit(self.note_id, self.title)
-
-    # def show(self):
-    #     "Show widget."
-    #     self.setVisible(True)
-
-    # def hide(self):
-    #     "Hide widget."
-    #     self.setVisible(False)
+            self.request_delete.emit(self.note_id, self.title)
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    '''Main window.'''
+    "Main window."
     def __init__(self, db):
         super().__init__()
         self.db = db
@@ -76,7 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.center_window()
 
     def center_window(self):
-        'Move the window to the center.'
+        "Move the window to the center."
         screen = QtGui.QGuiApplication.primaryScreen()
         center_point = screen.availableGeometry().center()
 
@@ -84,70 +76,10 @@ class MainWindow(QtWidgets.QMainWindow):
         frame.moveCenter(center_point)
         self.move(frame.topLeft())
 
-    def adding_data_into_widget(self, note):
-        '''Add data into VBox Layout. Then it'll add to a grid.'''
-        box = QtWidgets.QWidget()
-
-        notes_box = QtWidgets.QVBoxLayout(box)
-        note_id = note[0]
-        title = note[1][0]
-        text = note[1][1]
-        tags = note[1][2]
-        note_button = NoteButton(note_id, title, text, tags)
-
-        # Adding propertis for editing note
-        note_button.note_id = note_id
-        note_button.title = title
-        note_button.text = text
-        note_button.tags = tags
-        note_button.created_at = note[1][3]
-
-        # box.setObjectName(f"note_box_{note_id}")
-        box.setProperty("noteId", note_id)
-        box.setProperty("noteTitle", title)
-        box.setProperty("noteText", text)
-        box.setProperty("noteTags", tags)
-
-        note_button.clicked.connect(self.show_single_note)
-        note_button.requestDelete.connect(self.confirm_delete_note)
-        notes_box.addWidget(note_button)
-        return box
-
-    def show_single_note(self):
-        '''Show note to user; user can update note.'''
-        sender = self.sender()
-        self.editing_button = sender
-        self.create_note(
-            sender.title, sender.text, sender.tags,
-            sender.created_at, is_update=True
-        )
-
-    def confirm_delete_note(self, note_id, title):
-        reply = QtWidgets.QMessageBox.question(
-            self,
-            'Delete note',
-            f'Are you sure you want to delete note "{title}"?',
-            QtWidgets.QMessageBox.StandardButton.Yes |
-            QtWidgets.QMessageBox.StandardButton.No
-        )
-
-        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-            self.db.delete_note(note_id)
-
-            r, c = self.coord[note_id]
-
-            wd = self.notes_grid.itemAtPosition(r, c).widget()
-            self.notes_grid.removeWidget(wd)
-            wd.deleteLater()
-
-            self.notes.pop(note_id)
-            self.coord.pop(note_id)
-            self.refresh_notes()
-
     def show_main_window(self):
-        'Display main window with all notes.'
-        self.notes = self.load_notes()
-        self.coord = {}
+        "Display main window with all notes."
+        self.notes = self.load_notes_from_db()
+        self.note_widgets = {}
 
         self.scroll_main_window = QtWidgets.QScrollArea()
         self.window = QtWidgets.QWidget()
@@ -166,7 +98,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Adding data into grid
         self.cols = 2
-        self.add_item_to_grid()
+        self.fill_note_widgets()
 
         self.main_box.addWidget(
             self.create_button,
@@ -186,64 +118,154 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.addWidget(self.scroll_main_window)
         self.stack.setCurrentWidget(self.scroll_main_window)
 
-    def add_item_to_grid(self):
+    # def create_note_widget(self, note_id, title, text, tags, created_at):
+    #     box = QtWidgets.QWidget()
+    #     layout = QtWidgets.QVBoxLayout(box)
+
+    #     btn = NoteButton(note_id, title, text, tags, created_at)
+    #     btn.clicked.connect(self.show_single_note)
+    #     btn.request_delete.connect(self.confirm_delete_note)
+
+    #     # store data for search
+    #     box.setProperty("noteId", note_id)
+    #     box.setProperty("noteTitle", title)
+    #     box.setProperty("noteText", text)
+    #     box.setProperty("noteTags", tags)
+
+    #     layout.addWidget(btn)
+    #     return box
+    
+    # def load_all_notes(self):
+    #     for note_id, (title, text, tags, created_at) in self.notes.items():
+    #         widget = self.create_note_widget(note_id, title, text, tags, created_at)
+    #         self.note_widgets[note_id] = widget
+
+    #     self.rebuild_grid(list(self.note_widgets.values()))
+
+    def adding_data_into_widget(self, note_id: int, *note: tuple):
+        "Add data into VBox Layout. Then it'll add to a grid."
+        box = QtWidgets.QWidget()
+
+        notes_box = QtWidgets.QVBoxLayout(box)
+        note_id = note_id
+        title = note[0]
+        text = note[1]
+        tags = note[2]
+        created_at = note[3]
+        note_button = NoteButton(note_id, title, text, tags, created_at)
+
+        # Add data for sender. For editing.
+        note_button.note_id = note_id
+        note_button.title = title
+        note_button.text = text
+        note_button.tags = tags
+        note_button.created_at = created_at
+
+        # Set properties to widget. For searching.
+        box.setProperty("noteId", note_id)
+        box.setProperty("noteTitle", title)
+        box.setProperty("noteText", text)
+        box.setProperty("noteTags", tags)
+
+        note_button.clicked.connect(self.show_single_note)
+        note_button.request_delete.connect(self.confirm_delete_note)
+        notes_box.addWidget(note_button)
+        return box
+
+    def show_single_note(self):
+        "Show note to user; user can update note."
+        sender = self.sender()
+        self.editing_button = sender
+        self.create_note(
+            sender.title, sender.text, sender.tags,
+            sender.created_at, is_update=True
+        )
+
+    def confirm_delete_note(self, note_id, title):
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            'Delete note',
+            f'Are you sure you want to delete note "{title}"?',
+            QtWidgets.QMessageBox.StandardButton.Yes |
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            self.db.delete_note(note_id)
+
+            widget = self.note_widgets.pop(note_id)
+            self.notes_grid.removeWidget(widget)
+            widget.deleteLater()
+            self.notes.pop(note_id, None)
+            self.rebuild_grid(list(self.note_widgets.values()))
+
+    def fill_note_widgets(self):
+        "Fill note_widgets dict with widgets forming from notes."
         notes_box, r, c = None, None, None
         for i, note in enumerate(self.notes.items()):
+            note_id, (title, text, tags, created_at) = note
             r, c = divmod(i, self.cols)
-            notes_box = self.adding_data_into_widget(note)
-            # For each note's id save its coordinate.
-            self.coord[note[0]] = (r, c)
+            notes_box = self.adding_data_into_widget(note_id, title, text, tags, created_at)
+            self.note_widgets[note_id] = notes_box
 
-            self.notes_grid.addWidget(
-                notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
-            )
+        self.rebuild_grid(list(self.note_widgets.values()))
         return notes_box, r, c
 
-    def refresh_notes(self, data=None):
+    def clean_grid_layout(self):
+        "Clear grid layout from all widgets."
         for i in reversed(range(self.notes_grid.count())):
             widget = self.notes_grid.itemAt(i).widget()
             if widget:
                 self.notes_grid.removeWidget(widget)
-                widget.deleteLater()
 
-        if data:
-            self.notes[data['note_id']] = (
-                data['title'], data['text'], data['tags'], data['created_at']
+    def rebuild_grid(self, widgets):
+        "Reform grid layout after changing in notes_grid dict."
+        self.clean_grid_layout()
+
+        for i, w in enumerate(widgets):
+            r, c = divmod(i, self.cols)
+            self.notes_grid.addWidget(
+                w, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
             )
 
-        notes_box, r, c = self.add_item_to_grid()
+    def refresh_notes(self, data):
+        "Reform grid layout after adding new data."
+        self.clean_grid_layout()
 
-        #REMOVE?
-        # self.notes_grid.addWidget(
-        #     notes_box, r, c, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
-        # )
+        self.notes[data['note_id']] = (
+            data['title'], data['text'], data['tags'], data['created_at']
+        )
 
-    def update_display(self, text):
-        query = text.lower().strip()
+        self.fill_note_widgets()
+
+    def update_display(self, search_input):
+        "Form widgets which satisfy user's input."
+        query = search_input.lower().strip()
+        if not query:
+            for w in self.note_widgets.values():
+                w.setVisible(True)
+            self.rebuild_grid(list(self.note_widgets.values()))
+            return
 
         visible_widgets = []
-        for i in range(self.notes_grid.count()):
-            container = self.notes_grid.itemAt(i).widget()
-
-            title = container.property("noteTitle") or ""
-            preview = container.property("noteText") or ""
-            tags = container.property("noteTags") or []
+        for widget in self.note_widgets.values():
+            title = widget.property('noteTitle').lower()
+            text = widget.property('noteText').lower()
+            preview = widget.property('noteText').lower()
+            tags = widget.property('noteTags') or []
 
             is_match = (
-                query in title.lower()
-                or query in preview.lower()
+                query in title
+                or query in text
+                or query in preview
                 or any(query in t.lower() for t in tags)
             )
 
-            container.setVisible(is_match)
+            widget.setVisible(is_match)
             if is_match:
-                visible_widgets.append(container)
+                visible_widgets.append(widget)
 
-        self.search_bar.textChanged.disconnect(self.update_display)
-        # self.notes_grid.setSizeConstraint(self.main_box.SizeConstraint.SetFixedSize)
-        # self.notes_grid.setSizeConstraint(QtWidgets.minimumSize())
-        # self.main_box.SizeConstraint()
-        # self.refactor_grid(visible_widgets)
+        self.rebuild_grid(visible_widgets)
 
     def create_note(
             self, title=None, text=None, tags=None, date=None, is_update=False
@@ -368,7 +390,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def click_back_button(self):
         self.stack.setCurrentWidget(self.scroll_main_window)
 
-    def load_notes(self) -> dict:
+    def load_notes_from_db(self) -> dict:
         data = self.db.get_all_data_from_db()
         return data
 
