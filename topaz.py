@@ -118,30 +118,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stack.addWidget(self.scroll_main_window)
         self.stack.setCurrentWidget(self.scroll_main_window)
 
-    # def create_note_widget(self, note_id, title, text, tags, created_at):
-    #     box = QtWidgets.QWidget()
-    #     layout = QtWidgets.QVBoxLayout(box)
-
-    #     btn = NoteButton(note_id, title, text, tags, created_at)
-    #     btn.clicked.connect(self.show_single_note)
-    #     btn.request_delete.connect(self.confirm_delete_note)
-
-    #     # store data for search
-    #     box.setProperty("noteId", note_id)
-    #     box.setProperty("noteTitle", title)
-    #     box.setProperty("noteText", text)
-    #     box.setProperty("noteTags", tags)
-
-    #     layout.addWidget(btn)
-    #     return box
-    
-    # def load_all_notes(self):
-    #     for note_id, (title, text, tags, created_at) in self.notes.items():
-    #         widget = self.create_note_widget(note_id, title, text, tags, created_at)
-    #         self.note_widgets[note_id] = widget
-
-    #     self.rebuild_grid(list(self.note_widgets.values()))
-
     def adding_data_into_widget(self, note_id: int, *note: tuple):
         "Add data into VBox Layout. Then it'll add to a grid."
         box = QtWidgets.QWidget()
